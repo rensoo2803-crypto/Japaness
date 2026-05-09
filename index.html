@@ -1,0 +1,818 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+<title>日本語必須単語1700 - 学習機</title>
+
+<script src="https://cdn.tailwindcss.com"></script>
+
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700;900&display=swap');
+
+body {
+    font-family: 'Noto Sans JP', sans-serif;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+    display: none;
+}
+
+.no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+
+#scrollWrapper {
+    cursor: grab;
+    user-select: none;
+}
+
+#scrollWrapper:active {
+    cursor: grabbing;
+}
+
+.card-container {
+    perspective: 1000px;
+}
+
+.card {
+    transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    transform-style: preserve-3d;
+    touch-action: pan-y;
+}
+
+.card.flipped {
+    transform: rotateY(180deg);
+}
+
+.card-face {
+    backface-visibility: hidden;
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    border-radius: 1.5rem;
+}
+
+.card-back {
+    transform: rotateY(180deg);
+}
+</style>
+</head>
+
+<body class="bg-gray-100 min-h-screen flex flex-col items-center">
+
+<!-- 상단 -->
+<div class="w-full max-w-md bg-white rounded-b-3xl shadow-xl p-4 mb-4 z-10">
+
+    <div class="mb-4 flex justify-between items-center">
+        <h1 class="text-2xl font-black text-gray-800">
+            五十音選択
+        </h1>
+
+        <button
+            onclick="loadAll()"
+            class="bg-blue-600 text-white px-4 py-2 rounded-full text-sm font-bold shadow-lg active:scale-95 transition-all"
+        >
+            全部学習
+        </button>
+    </div>
+
+    <!-- 행 선택 -->
+    <div
+        id="scrollWrapper"
+        class="overflow-x-auto no-scrollbar mb-5 touch-pan-x"
+        style="-webkit-overflow-scrolling: touch;"
+    >
+        <div
+            class="flex gap-2 px-1 flex-nowrap min-w-max"
+            id="rowLabelsContainer"
+        >
+        </div>
+    </div>
+
+    <!-- 글자 선택 -->
+    <div class="bg-gray-50 rounded-3xl p-4 border border-gray-100">
+
+        <div
+            class="text-xs text-blue-500 font-black mb-3 ml-1 tracking-widest"
+            id="selectedRowName"
+        >
+            あ行
+        </div>
+
+        <div
+            class="grid grid-cols-5 gap-2"
+            id="charGrid"
+        >
+        </div>
+
+    </div>
+
+</div>
+
+<!-- 카드 -->
+<div
+    class="flex-1 w-full max-w-md px-4 flex items-center justify-center relative card-container"
+    id="swipeArea"
+>
+
+    <div
+        class="card w-full h-[420px] relative cursor-pointer"
+        id="card"
+    >
+
+        <!-- 앞면 -->
+        <div
+            class="card-face card-front bg-white shadow-2xl p-8 flex flex-col items-center justify-center text-center border border-gray-100"
+        >
+
+            <div
+                class="text-5xl font-black text-gray-800 mb-2"
+                id="frontWord"
+            >
+                学習開始
+            </div>
+
+            <div
+                class="text-xl text-gray-400 font-bold mb-8"
+                id="frontReading"
+            >
+                [読み方]
+            </div>
+
+            <div
+                class="w-full border-t border-gray-50 pt-8 text-lg text-gray-600 leading-relaxed"
+                id="frontSentence"
+            >
+                上の文字を選択してください。
+            </div>
+
+        </div>
+
+        <!-- 뒷면 -->
+        <div
+            class="card-face card-back bg-orange-50 shadow-2xl p-8 flex flex-col items-center justify-center text-center border-4 border-orange-200"
+        >
+
+            <div class="text-sm font-black text-orange-300 mb-2 uppercase tracking-widest">
+                Meaning
+            </div>
+
+            <div
+                class="text-4xl font-black text-red-500 mb-8"
+                id="backMeaning"
+            >
+                意味
+            </div>
+
+            <div class="text-sm font-black text-orange-300 mb-2 uppercase tracking-widest">
+                Translation
+            </div>
+
+            <div
+                class="text-lg text-green-700 font-bold leading-relaxed"
+                id="backTranslation"
+            >
+                翻訳
+            </div>
+
+            <div
+                class="absolute bottom-8 text-gray-300 font-black tracking-widest text-xs"
+                id="cardCounter"
+            >
+                0 / 0
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+<!-- 하단 버튼 -->
+<div class="w-full max-w-md p-4 flex gap-3 mb-3">
+
+    <button
+        onclick="prevCard()"
+        class="flex-1 py-4 bg-white text-gray-400 rounded-2xl font-bold shadow border border-gray-100 active:scale-95 transition-all"
+    >
+        前へ
+    </button>
+
+    <button
+        onclick="nextCard()"
+        class="flex-1 py-4 bg-gray-800 text-white rounded-2xl font-bold shadow-xl active:scale-95 transition-all"
+    >
+        次へ
+    </button>
+
+</div>
+
+<script src="data.js"></script>
+
+<script>
+
+// =========================
+// 五十音 데이터
+// =========================
+
+const gojuonTable = [
+    ["あ","い","う","え","お"],
+    ["か","き","く","け","こ"],
+    ["さ","し","す","せ","そ"],
+    ["た","ち","つ","て","と"],
+    ["な","に","ぬ","ね","の"],
+    ["は","ひ","ふ","へ","ほ"],
+    ["ま","み","む","め","も"],
+    ["や","","ゆ","","よ"],
+    ["ら","り","る","れ","ろ"],
+    ["わ","","を","","ん"]
+];
+
+const rowLabels = [
+    "あ","か","さ","た","な",
+    "は","ま","や","ら","わ"
+];
+
+// =========================
+// 상태값
+// =========================
+
+let currentList = [];
+let currentIndex = 0;
+let isDragging = false;
+
+let selectedRowIndex = 0;
+let selectedChar = null;
+
+// =========================
+// 데이터 가져오기
+// =========================
+
+function getDataSource() {
+
+    return typeof vocaData !== 'undefined'
+        ? vocaData
+        : (
+            typeof allvoca !== 'undefined'
+            ? allvoca
+            : []
+        );
+
+}
+
+// =========================
+// 초기 UI 생성
+// =========================
+
+function initGojuonUI() {
+
+    const container =
+        document.getElementById('rowLabelsContainer');
+
+    container.innerHTML = '';
+
+    rowLabels.forEach((label, idx) => {
+
+        const btn = document.createElement('button');
+
+        btn.dataset.index = idx;
+
+        btn.className =
+            `row-btn
+            flex-shrink-0
+            min-w-[60px]
+            h-12
+            rounded-2xl
+            text-sm
+            font-black
+            transition-all
+            active:scale-95`;
+
+        btn.innerText = label;
+
+        btn.onclick = () => {
+
+           // if (!isDragging) {
+                selectRow(idx);
+          //  }
+
+        };
+
+        container.appendChild(btn);
+
+    });
+
+    updateRowButtons();
+
+    renderCharGrid(0);
+
+    enableMouseDrag('scrollWrapper');
+
+}
+
+// =========================
+// 오십음도 행 버튼 색상
+// =========================
+
+function updateRowButtons() {
+
+    document
+        .querySelectorAll('.row-btn')
+        .forEach(btn => {
+
+            const idx =
+                Number(btn.dataset.index);
+
+            btn.classList.remove(
+                'bg-gray-800',
+                'text-white',
+                'shadow-lg'
+            );
+
+            btn.classList.add(
+                'bg-gray-100',
+                'text-gray-500'
+            );
+
+            if (
+                selectedRowIndex === idx &&
+                selectedChar === null
+            ) {
+
+                btn.classList.remove(
+                    'bg-gray-100',
+                    'text-gray-500'
+                );
+
+                btn.classList.add(
+                    'bg-gray-800',
+                    'text-white',
+                    'shadow-lg'
+                );
+
+            }
+
+        });
+
+}
+
+// =========================
+// 행 선택
+// =========================
+
+function selectRow(idx) {
+
+    selectedRowIndex = idx;
+
+    selectedChar = null;
+
+    updateRowButtons();
+
+    renderCharGrid(idx);
+
+    const sourceData = getDataSource();
+
+    const chars =
+        gojuonTable[idx].filter(v => v);
+
+    currentList =
+        sourceData.filter(item =>
+            chars.some(c =>
+                item.reading.startsWith(c)
+            )
+        );
+
+    document
+        .getElementById('selectedRowName')
+        .innerText =
+        `${rowLabels[idx]}行`;
+
+    if (currentList.length > 0) {
+
+        startLearning();
+
+    }
+
+}
+
+// =========================
+// 글자 버튼 생성
+// =========================
+
+function renderCharGrid(rowIdx) {
+
+    const grid =
+        document.getElementById('charGrid');
+
+    grid.innerHTML = '';
+
+    gojuonTable[rowIdx].forEach(char => {
+
+        const btn =
+            document.createElement('button');
+
+        btn.disabled = !char;
+
+        btn.dataset.char = char;
+
+        btn.className =
+            `char-btn
+            h-14
+            rounded-2xl
+            text-2xl
+            font-black
+            transition-all
+            active:scale-95`;
+
+        if (char) {
+
+            btn.classList.add(
+                'bg-white',
+                'shadow',
+                'border',
+                'border-gray-100',
+                'text-gray-700'
+            );
+
+        } else {
+
+            btn.classList.add(
+                'opacity-0',
+                'pointer-events-none'
+            );
+
+        }
+
+        btn.innerText = char;
+
+        btn.onclick = () => {
+
+            if (char) {
+                filterByChar(char);
+            }
+
+        };
+
+        grid.appendChild(btn);
+
+    });
+
+    updateCharButtons();
+
+}
+
+// =========================
+// 글자 버튼 색상
+// =========================
+
+function updateCharButtons() {
+
+    document
+        .querySelectorAll('.char-btn')
+        .forEach(btn => {
+
+            btn.classList.remove(
+                'bg-blue-600',
+                'text-white',
+                'border-blue-600',
+                'shadow-lg'
+            );
+
+            if (
+                btn.dataset.char === selectedChar
+            ) {
+
+                btn.classList.add(
+                    'bg-blue-600',
+                    'text-white',
+                    'border-blue-600',
+                    'shadow-lg'
+                );
+
+            }
+
+        });
+
+}
+
+// =========================
+// 글자 선택
+// =========================
+
+function filterByChar(char) {
+
+    selectedChar = char;
+
+    updateRowButtons();
+
+    updateCharButtons();
+
+    const sourceData = getDataSource();
+
+    currentList =
+        sourceData.filter(item =>
+            item.reading.startsWith(char)
+        );
+
+    document
+        .getElementById('selectedRowName')
+        .innerText =
+        `「${char}」学習中`;
+
+    if (currentList.length > 0) {
+
+        startLearning();
+
+    } else {
+
+        alert('単語がありません。');
+
+    }
+
+}
+
+// =========================
+// 전체 학습
+// =========================
+
+function loadAll() {
+
+    selectedChar = null;
+
+    selectedRowIndex = null;
+
+    updateRowButtons();
+
+    renderCharGrid(0);
+
+    const sourceData = getDataSource();
+
+    currentList = [...sourceData];
+
+    document
+        .getElementById('selectedRowName')
+        .innerText =
+        '全部学習中';
+
+    if (currentList.length > 0) {
+
+        startLearning();
+
+    }
+
+}
+
+// =========================
+// 카드 시작
+// =========================
+
+function startLearning() {
+
+    shuffle(currentList);
+
+    currentIndex = 0;
+
+    updateCard();
+
+}
+
+// =========================
+// 셔플
+// =========================
+
+function shuffle(array) {
+
+    for (
+        let i = array.length - 1;
+        i > 0;
+        i--
+    ) {
+
+        const j =
+            Math.floor(
+                Math.random() * (i + 1)
+            );
+
+        [array[i], array[j]] =
+        [array[j], array[i]];
+
+    }
+
+}
+
+// =========================
+// 카드 갱신
+// =========================
+
+function updateCard() {
+
+    if (currentList.length === 0) return;
+
+    const data =
+        currentList[currentIndex];
+
+    const card =
+        document.getElementById('card');
+
+    card.classList.remove('flipped');
+
+    setTimeout(() => {
+
+        document
+            .getElementById('frontWord')
+            .innerText = data.word;
+
+        document
+            .getElementById('frontReading')
+            .innerText =
+            `[${data.reading}]`;
+
+        document
+            .getElementById('frontSentence')
+            .innerText =
+            data.sentence;
+
+        document
+            .getElementById('backMeaning')
+            .innerText =
+            data.meaning;
+
+        document
+            .getElementById('backTranslation')
+            .innerText =
+            data.translation;
+
+        document
+            .getElementById('cardCounter')
+            .innerText =
+            `${currentIndex + 1} / ${currentList.length}`;
+
+    }, 150);
+
+}
+
+// =========================
+// 다음 / 이전
+// =========================
+
+function nextCard() {
+
+    if (
+        currentIndex <
+        currentList.length - 1
+    ) {
+
+        currentIndex++;
+
+        updateCard();
+
+    }
+
+}
+
+function prevCard() {
+
+    if (currentIndex > 0) {
+
+        currentIndex--;
+
+        updateCard();
+
+    }
+
+}
+
+// =========================
+// 카드 뒤집기
+// =========================
+
+document
+    .getElementById('card')
+    .onclick = function () {
+
+    this.classList.toggle('flipped');
+
+};
+
+// =========================
+// 모바일 스와이프
+// =========================
+
+let startTouchX = 0;
+
+document
+    .getElementById('swipeArea')
+    .ontouchstart = e => {
+
+    startTouchX =
+        e.touches[0].clientX;
+
+};
+
+document
+    .getElementById('swipeArea')
+    .ontouchend = e => {
+
+    const diff =
+        startTouchX -
+        e.changedTouches[0].clientX;
+
+    if (Math.abs(diff) > 70) {
+
+        diff > 0
+            ? nextCard()
+            : prevCard();
+
+    }
+
+};
+
+// =========================
+// PC 드래그 스크롤
+// =========================
+
+function enableMouseDrag(elementId) {
+
+    const slider =
+        document.getElementById(elementId);
+
+    let startX;
+    let scrollLeft;
+
+    slider.addEventListener(
+        'mousedown',
+        e => {
+
+        isDragging = true;
+
+        startX =
+            e.pageX -
+            slider.offsetLeft;
+
+        scrollLeft =
+            slider.scrollLeft;
+
+    });
+
+    slider.addEventListener(
+        'mouseleave',
+        () => {
+
+        isDragging = false;
+
+    });
+
+    slider.addEventListener(
+        'mouseup',
+        () => {
+
+        setTimeout(() => {
+
+            isDragging = false;
+
+        }, 50);
+
+    });
+
+    slider.addEventListener(
+        'mousemove',
+        e => {
+
+        if (!isDragging) return;
+
+        e.preventDefault();
+
+        const x =
+            e.pageX -
+            slider.offsetLeft;
+
+        const walk =
+            (x - startX) * 2;
+
+        slider.scrollLeft =
+            scrollLeft - walk;
+
+    });
+
+}
+
+// =========================
+// 시작
+// =========================
+
+window.onload = () => {
+
+    initGojuonUI();
+
+    loadAll();
+
+};
+
+</script>
+
+</body>
+</html>
